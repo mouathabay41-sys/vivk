@@ -1,70 +1,133 @@
 <!DOCTYPE html>
-<html lang="ar">
+<html lang="ar" dir="rtl">
 <head>
-  <meta charset="UTF-8">
-  <title>محادثة</title>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width,initial-scale=1" />
+  <title>🤖 Vivk AI</title>
   <style>
-    body { font-family: sans-serif; direction: rtl; background: #f7f7f7; }
-    #chat { max-width: 600px; margin: auto; padding: 20px; background: white; border-radius: 8px; }
-    .msg { margin: 10px 0; }
-    .user { color: blue; }
-    .bot { color: green; }
-    input, button { padding: 10px; margin-top: 10px; width: 100%; }
+    :root{
+      --bg:#0b0b0b; --card:#121212; --accent:#00ff7f; --muted:#bdbdbd;
+    }
+    *{box-sizing:border-box}
+    body{margin:0;background:var(--bg);color:var(--muted);font-family:Tahoma,Arial,sans-serif;display:flex;flex-direction:column;min-height:100vh;align-items:center;padding:18px}
+    header{color:var(--accent);font-size:22px;font-weight:700;margin-bottom:12px;display:flex;gap:10px;align-items:center}
+    #app{width:100%;max-width:800px;display:flex;flex-direction:column;align-items:stretch}
+    #chat{background:var(--card);border-radius:12px;padding:14px;height:60vh;overflow:auto;border:1px solid rgba(0,255,127,0.08)}
+    .bubble{margin:8px 0;padding:12px;border-radius:10px;max-width:86%}
+    .user{background:var(--accent);color:#000;margin-left:auto;text-align:right}
+    .bot{background:#171717;color:#e8ffe9;border:1px solid rgba(0,255,127,0.12)}
+    .bot strong{color:var(--accent)}
+    .img-resp{max-width:100%;border-radius:8px;display:block;margin-top:8px}
+    #controls{display:flex;gap:8px;margin-top:12px}
+    #text{flex:1;padding:12px;border-radius:10px;border:1px solid #222;background:#0b0b0b;color:var(--muted);outline:none}
+    button{padding:0 16px;border-radius:10px;border:none;background:var(--accent);color:#000;font-weight:700;cursor:pointer}
+    .muted-btn{background:#222;color:var(--muted)}
+    .small{padding:8px 12px}
+    footer{font-size:13px;color:#777;margin-top:14px}
+    @media (max-width:480px){#chat{height:56vh}}
   </style>
 </head>
 <body>
-  <div id="chat">
-    <div id="messages"></div>
-    <input id="input" placeholder="اكتب رسالتك...">
-    <button onclick="sendMessage()">إرسال</button>
-    <button onclick="generateImage()">تحويل إلى صورة</button>
+  <header>🤖 فييك - Vivk AI</header>
+  <div id="app">
+    <div id="chat" aria-live="polite"></div>
+
+    <div style="display:flex;gap:8px;align-items:center;margin-top:12px">
+      <button id="modeBtn" class="muted-btn small">🔁 وضع: نص</button>
+      <div style="flex:1;display:flex;gap:8px" id="controls">
+        <input id="text" placeholder="اكتب هنا (أو اكتب: !image وصف الصورة)" />
+        <button id="send">إرسال</button>
+      </div>
+    </div>
+
+    <footer>ملاحظة: الصور تولد عبر OpenAI وسيتم حفظها فقط مؤقتاً. تأكد من الوصف والمحتوى الآمن.</footer>
   </div>
 
   <script>
-    async function sendMessage() {
-      const input = document.getElementById("input");
-      const msg = input.value;
-      if (!msg) return;
+    const chatEl = document.getElementById("chat");
+    const input = document.getElementById("text");
+    const sendBtn = document.getElementById("send");
+    const modeBtn = document.getElementById("modeBtn");
+    let mode = "chat"; // "chat" أو "image"
 
-      addMessage("user", msg);
-      input.value = "";
-
-      const res = await fetch("/api/chat", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ message: msg })
-      });
-      const data = await res.json();
-      addMessage("bot", data.reply || "خطأ في الرد");
+    function addBubble(text, who="bot", isHTML=false) {
+      const div = document.createElement("div");
+      div.className = "bubble " + (who==="user" ? "user" : "bot");
+      if(isHTML) div.innerHTML = text; else div.textContent = text;
+      chatEl.appendChild(div);
+      chatEl.scrollTop = chatEl.scrollHeight;
+      return div;
     }
 
-    async function generateImage() {
-      const input = document.getElementById("input");
-      const prompt = input.value;
-      if (!prompt) return;
+    modeBtn.addEventListener("click", () => {
+      mode = (mode === "chat") ? "image" : "chat";
+      modeBtn.textContent = mode === "chat" ? "🔁 وضع: نص" : "🖼️ وضع: صورة";
+      input.placeholder = mode === "chat" ? "اكتب هنا (أو اكتب: !image وصف الصورة)" : "اكلِم المولد: وصف الصورة التي تريدها...";
+    });
 
-      addMessage("user", prompt);
+    async function send() {
+      const text = input.value.trim();
+      if (!text) return;
+
+      // استقبال أمر مباشر لعمل صورة: !image وصف...
+      if (text.startsWith("!image ") || mode === "image") {
+        const prompt = text.startsWith("!image ") ? text.slice(7).trim() : text;
+        addBubble("👤 " + (prompt || text), "user");
+        input.value = "";
+        const loading = addBubble("⏳ يتم توليد الصورة... الرجاء الانتظار", "bot");
+        try {
+          const res = await fetch("/api/chat", {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({ type: "image", prompt, size: "1024x1024" })
+          });
+          const data = await res.json();
+          loading.remove();
+          if (data.error) {
+            addBubble("⚠️ خطأ: " + (data.error.message || data.error), "bot");
+            return;
+          }
+          if (data.image) {
+            const html = `<strong>فييك - Vivk AI:</strong><br><img src="${data.image}" class="img-resp" alt="generated image" />`;
+            addBubble(html, "bot", true);
+          } else {
+            addBubble("لم يتم توليد صورة.", "bot");
+          }
+        } catch (err) {
+          loading.remove();
+          addBubble("❌ خطأ في الاتصال: " + err.message, "bot");
+        }
+        return;
+      }
+
+      // normal chat
+      addBubble("👤 " + text, "user");
       input.value = "";
-
-      const res = await fetch("/api/image", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ prompt })
-      });
-      const data = await res.json();
-      if (data.url) {
-        addMessage("bot", `<img src="${data.url}" width="300">`);
-      } else {
-        addMessage("bot", "فشل إنشاء الصورة");
+      const loading = addBubble("⏳ فييك يفكر...", "bot");
+      try {
+        const res = await fetch("/api/chat", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ type: "chat", message: text })
+        });
+        const data = await res.json();
+        loading.remove();
+        if (data.error) {
+          addBubble("⚠️ خطأ: " + (data.error || "لم نتحصل على رد"), "bot");
+        } else {
+          addBubble(`<strong>فييك - Vivk AI:</strong>\n${data.reply}`, "bot", true);
+        }
+      } catch (err) {
+        loading.remove();
+        addBubble("❌ خطأ في الاتصال: " + err.message, "bot");
       }
     }
 
-    function addMessage(role, text) {
-      const div = document.createElement("div");
-      div.className = "msg " + role;
-      div.innerHTML = `<b>${role === "user" ? "أنت" : "الذكاء"}:</b> ${text}`;
-      document.getElementById("messages").appendChild(div);
-    }
+    sendBtn.addEventListener("click", send);
+    input.addEventListener("keydown", (e) => { if (e.key === "Enter") send(); });
+
+    // رسالة ترحيب افتراضية
+    addBubble("مرحباً! أنا فييك — مساعد ذكي. اكتب سؤالاً أو اضغط على زر الوضع لإنشاء صورة.", "bot");
   </script>
 </body>
 </html>
