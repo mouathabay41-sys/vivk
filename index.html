@@ -1,0 +1,22 @@
+<!DOCTYPE html>
+<html lang="ar">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>🤖 Vivk AI</title>
+</head>
+<body style="background:#000; color:#fff; font-family:Arial; text-align:center;">
+  <h1>🤖 Vivk AI</h1>
+  <div id="chat" style="width:90%;max-width:600px;height:400px;margin:auto;background:#111;padding:10px;overflow-y:auto;border-radius:10px;"></div>
+  <input id="input" style="width:70%;padding:10px;" placeholder="اكتب رسالتك هنا...">
+  <button id="send" style="padding:10px 20px;background:green;color:#fff;border:none;">إرسال</button>
+
+  <script>
+    const chat=document.getElementById("chat"),input=document.getElementById("input"),send=document.getElementById("send");
+    function addMessage(content,sender){const m=document.createElement("div");m.textContent=content;chat.appendChild(m);chat.scrollTop=chat.scrollHeight;}
+    send.onclick=async()=>{const message=input.value.trim();if(!message)return;addMessage("👤 "+message,"user");input.value="";
+      const r=await fetch("/api/chat",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({message})});
+      const d=await r.json();addMessage("🤖 "+(d.reply||"خطأ"),"bot");};
+  </script>
+</body>
+</html>
