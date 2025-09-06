@@ -2,21 +2,69 @@
 <html lang="ar">
 <head>
   <meta charset="UTF-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>🤖 Vivk AI</title>
+  <title>محادثة</title>
+  <style>
+    body { font-family: sans-serif; direction: rtl; background: #f7f7f7; }
+    #chat { max-width: 600px; margin: auto; padding: 20px; background: white; border-radius: 8px; }
+    .msg { margin: 10px 0; }
+    .user { color: blue; }
+    .bot { color: green; }
+    input, button { padding: 10px; margin-top: 10px; width: 100%; }
+  </style>
 </head>
-<body style="background:#000; color:#fff; font-family:Arial; text-align:center;">
-  <h1>🤖 Vivk AI</h1>
-  <div id="chat" style="width:90%;max-width:600px;height:400px;margin:auto;background:#111;padding:10px;overflow-y:auto;border-radius:10px;"></div>
-  <input id="input" style="width:70%;padding:10px;" placeholder="اكتب رسالتك هنا...">
-  <button id="send" style="padding:10px 20px;background:green;color:#fff;border:none;">إرسال</button>
+<body>
+  <div id="chat">
+    <div id="messages"></div>
+    <input id="input" placeholder="اكتب رسالتك...">
+    <button onclick="sendMessage()">إرسال</button>
+    <button onclick="generateImage()">تحويل إلى صورة</button>
+  </div>
 
   <script>
-    const chat=document.getElementById("chat"),input=document.getElementById("input"),send=document.getElementById("send");
-    function addMessage(content,sender){const m=document.createElement("div");m.textContent=content;chat.appendChild(m);chat.scrollTop=chat.scrollHeight;}
-    send.onclick=async()=>{const message=input.value.trim();if(!message)return;addMessage("👤 "+message,"user");input.value="";
-      const r=await fetch("/api/chat",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({message})});
-      const d=await r.json();addMessage("🤖 "+(d.reply||"خطأ"),"bot");};
+    async function sendMessage() {
+      const input = document.getElementById("input");
+      const msg = input.value;
+      if (!msg) return;
+
+      addMessage("user", msg);
+      input.value = "";
+
+      const res = await fetch("/api/chat", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ message: msg })
+      });
+      const data = await res.json();
+      addMessage("bot", data.reply || "خطأ في الرد");
+    }
+
+    async function generateImage() {
+      const input = document.getElementById("input");
+      const prompt = input.value;
+      if (!prompt) return;
+
+      addMessage("user", prompt);
+      input.value = "";
+
+      const res = await fetch("/api/image", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ prompt })
+      });
+      const data = await res.json();
+      if (data.url) {
+        addMessage("bot", `<img src="${data.url}" width="300">`);
+      } else {
+        addMessage("bot", "فشل إنشاء الصورة");
+      }
+    }
+
+    function addMessage(role, text) {
+      const div = document.createElement("div");
+      div.className = "msg " + role;
+      div.innerHTML = `<b>${role === "user" ? "أنت" : "الذكاء"}:</b> ${text}`;
+      document.getElementById("messages").appendChild(div);
+    }
   </script>
 </body>
 </html>
